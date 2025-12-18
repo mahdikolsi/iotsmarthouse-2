@@ -32,7 +32,7 @@ if (!DB_URL || !CLIENT_EMAIL || !PRIVATE_KEY_RAW) {
 function corsHeaders(): HeadersInit {
   return {
     "access-control-allow-origin": CORS_ORIGIN,
-    "access-control-allow-headers": "content-type",
+    "access-control-allow-headers": "content-type, x-api-key",
     "access-control-allow-methods": "GET,POST,PUT,PATCH,OPTIONS",
   };
 }
