@@ -3,72 +3,338 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart House Control</title>
+  <title>Smart House Command Center</title>
   <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 24px; line-height: 1.35; }
-    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; max-width: 880px; }
-    button { padding: 10px 14px; border-radius: 10px; border: 1px solid #bbb; background: #f7f7f7; cursor: pointer; }
-    button.primary { background: #1f6feb; border-color: #1f6feb; color: white; }
-    button.danger { background: #e5534b; border-color: #e5534b; color: white; }
-    input { padding: 10px; border-radius: 10px; border: 1px solid #bbb; min-width: 340px; }
-    code { background: #f3f3f3; padding: 2px 6px; border-radius: 6px; }
-    pre { background: #0b1020; color: #e6edf3; padding: 12px; border-radius: 10px; overflow: auto; }
-    .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-    .ok { background: #2da44e; }
-    .bad { background: #e5534b; }
-    .muted { color: #666; }
+    :root{
+      --bg: #0b1020;
+      --panel: rgba(255,255,255,.06);
+      --panel-2: rgba(255,255,255,.08);
+      --stroke: rgba(255,255,255,.10);
+      --text: #e6edf3;
+      --muted: rgba(230,237,243,.72);
+      --good: #2da44e;
+      --warn: #d29922;
+      --bad: #e5534b;
+      --accent: #4f8cff;
+      --shadow: 0 20px 60px rgba(0,0,0,.45);
+      --r: 16px;
+    }
+    * { box-sizing: border-box; }
+    body{
+      margin:0;
+      background:
+        radial-gradient(900px 500px at 15% 10%, rgba(79,140,255,.18), transparent 60%),
+        radial-gradient(700px 500px at 85% 20%, rgba(45,164,78,.16), transparent 55%),
+        radial-gradient(900px 650px at 50% 90%, rgba(229,83,75,.10), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      line-height: 1.25;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    .wrap{ max-width: 1200px; margin: 0 auto; padding: 22px; }
+    .topbar{
+      display:flex; align-items:flex-start; justify-content:space-between; gap: 16px;
+      margin-bottom: 18px;
+    }
+    .title{
+      display:flex; flex-direction:column; gap:6px;
+    }
+    .title h1{ margin:0; font-size: 22px; letter-spacing:.2px; }
+    .title p{ margin:0; color: var(--muted); font-size: 13px; }
+    .pill{
+      display:inline-flex; align-items:center; gap:10px;
+      padding: 8px 10px;
+      border: 1px solid var(--stroke);
+      border-radius: 999px;
+      background: rgba(255,255,255,.05);
+      white-space: nowrap;
+    }
+    .dot{ width:10px; height:10px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 4px rgba(229,83,75,.12); }
+    .dot.good{ background: var(--good); box-shadow: 0 0 0 4px rgba(45,164,78,.12); }
+    .dot.warn{ background: var(--warn); box-shadow: 0 0 0 4px rgba(210,153,34,.14); }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .card{
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.04));
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .card .hd{
+      padding: 14px 14px 10px 14px;
+      display:flex; align-items:center; justify-content:space-between; gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.03);
+    }
+    .card .hd h2{ margin:0; font-size: 14px; letter-spacing:.3px; text-transform: uppercase; color: rgba(230,237,243,.88); }
+    .card .bd{ padding: 14px; }
+
+    .field{
+      display:flex; flex-direction:column; gap:6px; margin-bottom: 12px;
+    }
+    label{ font-size: 12px; color: var(--muted); }
+    input, select{
+      width:100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.25);
+      color: var(--text);
+      outline: none;
+    }
+    input:focus{ border-color: rgba(79,140,255,.6); box-shadow: 0 0 0 4px rgba(79,140,255,.16); }
+
+    .btnrow{ display:flex; gap: 10px; flex-wrap:wrap; }
+    button{
+      appearance:none;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor:pointer;
+      transition: transform .05s ease, background .2s ease, border-color .2s ease;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    button:hover{ background: rgba(255,255,255,.09); }
+    button:active{ transform: translateY(1px); }
+    button.primary{ background: rgba(79,140,255,.22); border-color: rgba(79,140,255,.55); }
+    button.primary:hover{ background: rgba(79,140,255,.28); }
+    button.good{ background: rgba(45,164,78,.18); border-color: rgba(45,164,78,.5); }
+    button.good:hover{ background: rgba(45,164,78,.24); }
+    button.bad{ background: rgba(229,83,75,.18); border-color: rgba(229,83,75,.55); }
+    button.bad:hover{ background: rgba(229,83,75,.24); }
+    button.ghost{ background: transparent; }
+    button:disabled{ opacity:.55; cursor:not-allowed; }
+
+    .kpis{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 1180px){
+      .kpis{ grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px){
+      .kpis{ grid-template-columns: 1fr; }
+    }
+    .kpi{
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      border-radius: 14px;
+      padding: 12px;
+      display:flex; flex-direction:column; gap: 6px;
+      min-height: 74px;
+    }
+    .kpi .name{ color: var(--muted); font-size: 12px; }
+    .kpi .val{ font-size: 18px; font-weight: 800; letter-spacing:.2px; }
+    .badge{
+      display:inline-flex; align-items:center; gap:8px;
+      font-size: 12px; font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+    }
+    .badge.good{ border-color: rgba(45,164,78,.5); background: rgba(45,164,78,.12); }
+    .badge.warn{ border-color: rgba(210,153,34,.55); background: rgba(210,153,34,.12); }
+    .badge.bad{ border-color: rgba(229,83,75,.6); background: rgba(229,83,75,.12); }
+
+    .twoCol{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 700px){ .twoCol{ grid-template-columns: 1fr; } }
+
+    pre{
+      margin:0;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.35);
+      padding: 12px;
+      overflow:auto;
+      color: rgba(230,237,243,.92);
+      max-height: 360px;
+    }
+    .muted{ color: var(--muted); }
+    .small{ font-size: 12px; }
+    .hr{ height:1px; background: rgba(255,255,255,.08); margin: 12px 0; }
   </style>
 </head>
 <body>
-  <h1>Smart House Control (Test UI)</h1>
-
-  <div class="card">
-    <div class="row">
-      <label><strong>Deno API Base</strong></label>
-      <input id="apiBase" value="https://iotsmarthouse-2.mahdikolsi.deno.net" />
-    </div>
-    <div class="row">
-      <label><strong>API Key</strong></label>
-      <input id="apiKey" value="wpHksbUkDmyje3ttSqnhUx7SoJ86Q28VbBZqbqVNpdeQspsiQWaF7nWcZXMxcXXfhtU5snXqZacthM" />
-      <span class="muted">Sent as <code>x-api-key</code></span>
-    </div>
-    <div class="row">
-      <label><strong>Device ID</strong></label>
-      <input id="deviceId" value="house01" />
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title">
+        <h1>Smart House Command Center</h1>
+        <p>Control actuators and monitor telemetry in near real-time via your Deno backend.</p>
+      </div>
+      <div class="pill">
+        <span id="connDot" class="dot"></span>
+        <div>
+          <div style="font-weight:800" id="connText">Disconnected</div>
+          <div class="small muted" id="connSub">—</div>
+        </div>
+      </div>
     </div>
 
-    <div class="row">
-      <span id="connDot" class="status-dot bad"></span>
-      <strong id="connText">Not checked</strong>
-      <button id="btnCheck">Check Backend</button>
-    </div>
-  </div>
+    <div class="grid">
+      <!-- LEFT: SETTINGS + CONTROLS -->
+      <div class="card">
+        <div class="hd">
+          <h2>Connection</h2>
+          <button class="ghost" id="btnCheck">Check</button>
+        </div>
+        <div class="bd">
+          <div class="field">
+            <label>Deno API Base</label>
+            <input id="apiBase" value="https://iotsmarthouse-2.mahdikolsi.deno.net" />
+          </div>
 
-  <div class="card" style="margin-top: 16px;">
-    <h2>Door Control</h2>
-    <div class="row">
-      <button class="primary" id="btnOpen">Open Door</button>
-      <button class="danger" id="btnClose">Close Door</button>
-      <button id="btnReadTarget">Read doorTarget</button>
-    </div>
-    <div class="row">
-      <div><strong>doorTarget:</strong> <span id="doorTargetVal">—</span></div>
-    </div>
-  </div>
+          <div class="field">
+            <label>API Key (header: x-api-key)</label>
+            <input id="apiKey" value="wpHksbUkDmyje3ttSqnhUx7SoJ86Q28VbBZqbqVNpdeQspsiQWaF7nWcZXMxcXXfhtU5snXqZacthM" />
+          </div>
 
-  <div class="card" style="margin-top: 16px;">
-    <h2>Live State (optional)</h2>
-    <div class="row">
-      <button id="btnReadState">Read /api/state</button>
-      <span class="muted">Requires you to implement <code>GET /api/state</code> in backend.</span>
-    </div>
-    <pre id="stateOut">{}</pre>
-  </div>
+          <div class="field">
+            <label>Device ID</label>
+            <input id="deviceId" value="house01" />
+          </div>
 
-  <div class="card" style="margin-top: 16px;">
-    <h2>Logs</h2>
-    <pre id="logOut"></pre>
+          <div class="field">
+            <label>Auto-refresh</label>
+            <select id="refreshMs">
+              <option value="500">0.5s</option>
+              <option value="1000" selected>1s</option>
+              <option value="2000">2s</option>
+              <option value="5000">5s</option>
+              <option value="0">Off</option>
+            </select>
+          </div>
+
+          <div class="hr"></div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; gap: 10px;">
+            <div>
+              <div style="font-weight:900">Door</div>
+              <div class="muted small">Writes <code>doorTarget</code> command.</div>
+            </div>
+            <span id="doorBadge" class="badge">—</span>
+          </div>
+
+          <div class="btnrow" style="margin-top: 10px;">
+            <button class="good" id="btnDoorOpen">Open</button>
+            <button class="bad" id="btnDoorClose">Close</button>
+            <button class="primary" id="btnReadTarget">Read Target</button>
+          </div>
+
+          <div class="hr"></div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; gap: 10px;">
+            <div>
+              <div style="font-weight:900">Quick Actions</div>
+              <div class="muted small">UI-only unless you add backend endpoints.</div>
+            </div>
+          </div>
+
+          <div class="btnrow" style="margin-top: 10px;">
+            <button id="btnRefreshNow">Refresh Now</button>
+            <button id="btnCopyCurl">Copy cURL</button>
+            <button class="ghost" id="btnClearLog">Clear Log</button>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="muted small">
+            Tips:
+            <ul style="margin:8px 0 0 18px; padding:0;">
+              <li>For full dashboard, backend should expose <code>GET /api/state</code>.</li>
+              <li>Door control uses <code>POST /api/commands/doorTarget</code>.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: DASHBOARD -->
+      <div class="card">
+        <div class="hd">
+          <h2>Dashboard</h2>
+          <div class="btnrow">
+            <button class="ghost" id="btnReadState">Read /api/state</button>
+          </div>
+        </div>
+
+        <div class="bd">
+          <div class="kpis">
+            <div class="kpi">
+              <div class="name">Door (state.doorOpen)</div>
+              <div class="val" id="kpiDoor">—</div>
+              <div class="muted small" id="kpiDoorSub">—</div>
+            </div>
+
+            <div class="kpi">
+              <div class="name">Roof (state.roofClosed)</div>
+              <div class="val" id="kpiRoof">—</div>
+              <div class="muted small" id="kpiRoofSub">—</div>
+            </div>
+
+            <div class="kpi">
+              <div class="name">Alarm (state.alarmOn)</div>
+              <div class="val" id="kpiAlarm">—</div>
+              <div class="muted small" id="kpiAlarmSub">—</div>
+            </div>
+
+            <div class="kpi">
+              <div class="name">Fan (state.fanOn)</div>
+              <div class="val" id="kpiFan">—</div>
+              <div class="muted small" id="kpiFanSub">—</div>
+            </div>
+
+            <div class="kpi">
+              <div class="name">Gas Analog (telemetry.gasAnalog)</div>
+              <div class="val" id="kpiGas">—</div>
+              <div class="muted small" id="kpiGasSub">—</div>
+            </div>
+
+            <div class="kpi">
+              <div class="name">Motion (telemetry.motion)</div>
+              <div class="val" id="kpiMotion">—</div>
+              <div class="muted small" id="kpiMotionSub">—</div>
+            </div>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="twoCol">
+            <div>
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div style="font-weight:900">Device Snapshot</div>
+                <span class="muted small" id="lastUpdated">—</span>
+              </div>
+              <pre id="stateOut">{}</pre>
+            </div>
+
+            <div>
+              <div style="font-weight:900">Activity Log</div>
+              <div class="muted small">Client-side log of actions/responses.</div>
+              <pre id="logOut"></pre>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -82,8 +348,9 @@
   function cfg() {
     return {
       base: $("apiBase").value.replace(/\/+$/, ""),
-      key: $("apiKey").value,
+      key: $("apiKey").value.trim(),
       deviceId: $("deviceId").value.trim() || "house01",
+      refreshMs: parseInt($("refreshMs").value, 10),
     };
   }
 
@@ -91,9 +358,8 @@
     const { base, key, deviceId } = cfg();
     const url = `${base}${path}${path.includes("?") ? "&" : "?"}deviceId=${encodeURIComponent(deviceId)}`;
 
-    const headers = {
-      "x-api-key": key,
-    };
+    const headers = {};
+    if (key) headers["x-api-key"] = key; // keep compatible with your backend (even if you removed auth)
     if (body !== null) headers["content-type"] = "application/json";
 
     const res = await fetch(url, {
@@ -106,18 +372,30 @@
     return { ok: res.ok, status: res.status, text };
   }
 
+  function setConn(status, sub = "") {
+    const dot = $("connDot");
+    dot.className = "dot " + (status === "good" ? "good" : status === "warn" ? "warn" : "");
+    $("connText").textContent = status === "good" ? "Connected" : status === "warn" ? "Degraded" : "Disconnected";
+    $("connSub").textContent = sub || "—";
+  }
+
+  function badge(el, type, text) {
+    el.className = "badge " + (type || "");
+    el.textContent = text;
+  }
+
   async function checkBackend() {
     const { base } = cfg();
     try {
       const res = await fetch(base + "/");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      $("connDot").className = "status-dot ok";
-      $("connText").textContent = "Backend reachable";
+      setConn("good", "Backend reachable");
       log("Backend reachable");
+      return true;
     } catch (e) {
-      $("connDot").className = "status-dot bad";
-      $("connText").textContent = "Backend unreachable";
+      setConn("bad", "Backend unreachable");
       log("Backend unreachable: " + e);
+      return false;
     }
   }
 
@@ -131,46 +409,154 @@
       alert("Failed: " + res.text);
       return;
     }
-    log(`Set doorTarget = ${val}`);
-    await readDoorTarget();
+    log(`Set doorTarget = ${val ? "OPEN" : "CLOSE"}`);
+    await refreshAll(true);
   }
 
   async function readDoorTarget() {
     const res = await apiFetch("/api/commands/doorTarget", { method: "GET" });
     if (!res.ok) {
       log(`Read doorTarget failed: ${res.status} ${res.text}`);
-      $("doorTargetVal").textContent = "ERROR";
-      return;
+      badge($("doorBadge"), "bad", "doorTarget ERROR");
+      return null;
     }
-    const v = res.text.trim();
-    $("doorTargetVal").textContent = v;
+    const v = res.text.trim().toLowerCase();
+    const isOpen = (v === "true" || v === "1");
+    badge($("doorBadge"), isOpen ? "good" : "warn", "Target: " + (isOpen ? "OPEN" : "CLOSE"));
     log(`Read doorTarget = ${v}`);
+    return isOpen;
+  }
+
+  function setKpi(idVal, idSub, val, sub) {
+    $(idVal).textContent = val;
+    $(idSub).textContent = sub || "—";
+  }
+
+  function safeGet(obj, path) {
+    try {
+      return path.split(".").reduce((a, k) => (a && a[k] !== undefined ? a[k] : undefined), obj);
+    } catch { return undefined; }
+  }
+
+  function fmtBool(v, t = "ON", f = "OFF") {
+    if (v === true) return t;
+    if (v === false) return f;
+    return "—";
+  }
+
+  function gasClass(state) {
+    // Prefer state flags from ESP, fallback to analog thresholds (rough)
+    const danger = safeGet(state, "state.gasDanger");
+    const medium = safeGet(state, "state.gasMedium");
+    if (danger === true) return { cls: "bad", txt: "DANGER" };
+    if (medium === true) return { cls: "warn", txt: "MEDIUM" };
+    return { cls: "good", txt: "SAFE" };
   }
 
   async function readState() {
     const res = await apiFetch("/api/state", { method: "GET" });
     if (!res.ok) {
       log(`Read state failed: ${res.status} ${res.text}`);
-      alert("Your backend does not have GET /api/state yet.\n\nResponse: " + res.text);
-      return;
+      setConn("warn", "No /api/state or auth issue");
+      return null;
     }
     try {
-      $("stateOut").textContent = JSON.stringify(JSON.parse(res.text), null, 2);
-    } catch {
-      $("stateOut").textContent = res.text;
+      const obj = JSON.parse(res.text);
+      $("stateOut").textContent = JSON.stringify(obj, null, 2);
+
+      // KPIs
+      const doorOpen = safeGet(obj, "state.doorOpen");
+      const roofClosed = safeGet(obj, "state.roofClosed");
+      const alarmOn = safeGet(obj, "state.alarmOn");
+      const fanOn = safeGet(obj, "state.fanOn");
+      const gasAnalog = safeGet(obj, "telemetry.gasAnalog");
+      const motion = safeGet(obj, "telemetry.motion");
+      const wifiRssi = safeGet(obj, "meta.wifiRssi");
+      const lastSeenServer = safeGet(obj, "meta.lastSeenServerMs");
+      const lastSeenDevice = safeGet(obj, "meta.lastSeenDeviceMs");
+
+      setKpi("kpiDoor", "kpiDoorSub", fmtBool(doorOpen, "OPEN", "CLOSED"), "source: " + (safeGet(obj, "state.lastDoorSource") || "—"));
+      setKpi("kpiRoof", "kpiRoofSub", fmtBool(roofClosed, "CLOSED", "OPEN"), "auto by rain sensor");
+      setKpi("kpiAlarm", "kpiAlarmSub", fmtBool(alarmOn, "ALARM", "NORMAL"), "buzzer mirrors alarm");
+      setKpi("kpiFan", "kpiFanSub", fmtBool(fanOn, "ON", "OFF"), "auto by gas");
+
+      const gasText = (gasAnalog === undefined || gasAnalog === null) ? "—" : String(gasAnalog);
+      const gc = gasClass(obj);
+      setKpi("kpiGas", "kpiGasSub", gasText, "level: " + gc.txt + (wifiRssi ? ` • RSSI ${wifiRssi}` : ""));
+
+      setKpi("kpiMotion", "kpiMotionSub", fmtBool(motion, "DETECTED", "NONE"), "PIR activity");
+
+      // Connection indicator based on lastSeenServerMs if present
+      if (typeof lastSeenServer === "number") {
+        const age = Date.now() - lastSeenServer;
+        const ageS = Math.max(0, Math.floor(age / 1000));
+        $("lastUpdated").textContent = `last update: ${ageS}s ago`;
+
+        if (age < 3000) setConn("good", "Live");
+        else if (age < 12000) setConn("warn", "Stale (" + ageS + "s)");
+        else setConn("bad", "Offline (" + ageS + "s)");
+      } else {
+        $("lastUpdated").textContent = "last update: —";
+      }
+
+      return obj;
+    } catch (e) {
+      log("State JSON parse error: " + e);
+      return null;
     }
-    log("Read state ok");
   }
 
-  $("btnCheck").addEventListener("click", checkBackend);
-  $("btnOpen").addEventListener("click", () => setDoorTarget(true));
-  $("btnClose").addEventListener("click", () => setDoorTarget(false));
-  $("btnReadTarget").addEventListener("click", readDoorTarget);
-  $("btnReadState").addEventListener("click", readState);
+  async function refreshAll(readTargetAlso = false) {
+    // Prefer state read (includes most info). Read target separately if you want.
+    await readState();
+    if (readTargetAlso) await readDoorTarget();
+  }
 
-  // Auto-check on load
-  checkBackend();
-  readDoorTarget();
+  // Copy cURL for debugging
+  async function copyCurl() {
+    const { base, key, deviceId } = cfg();
+    const curl = `curl -i \\\n  -H "x-api-key: ${key}" \\\n  "${base}/api/commands/doorTarget?deviceId=${encodeURIComponent(deviceId)}"`;
+    await navigator.clipboard.writeText(curl);
+    log("Copied cURL command to clipboard.");
+    alert("Copied cURL to clipboard.");
+  }
+
+  function clearLog() {
+    $("logOut").textContent = "";
+    log("Log cleared.");
+  }
+
+  // Auto refresh loop
+  let timer = null;
+  function resetAutoRefresh() {
+    if (timer) clearInterval(timer);
+    const { refreshMs } = cfg();
+    if (!refreshMs) {
+      log("Auto-refresh: OFF");
+      return;
+    }
+    timer = setInterval(() => refreshAll(false), refreshMs);
+    log("Auto-refresh: every " + refreshMs + "ms");
+  }
+
+  // Bind UI
+  $("btnCheck").addEventListener("click", checkBackend);
+  $("btnDoorOpen").addEventListener("click", () => setDoorTarget(true));
+  $("btnDoorClose").addEventListener("click", () => setDoorTarget(false));
+  $("btnReadTarget").addEventListener("click", readDoorTarget);
+  $("btnReadState").addEventListener("click", () => refreshAll(true));
+  $("btnRefreshNow").addEventListener("click", () => refreshAll(true));
+  $("btnCopyCurl").addEventListener("click", copyCurl);
+  $("btnClearLog").addEventListener("click", clearLog);
+  $("refreshMs").addEventListener("change", resetAutoRefresh);
+
+  // Initial
+  (async () => {
+    setConn("bad", "Checking…");
+    await checkBackend();
+    await refreshAll(true);
+    resetAutoRefresh();
+  })();
 </script>
 </body>
 </html>
