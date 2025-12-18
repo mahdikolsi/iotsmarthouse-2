@@ -1,80 +1,176 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hello, Deno</title>
-  <link rel="preload" href="https://demo-styles.deno.deno.net/fonts/Moranga-Regular.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="https://demo-styles.deno.deno.net/fonts/Moranga-Medium.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="https://demo-styles.deno.deno.net/fonts/Recursive_Variable.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="https://demo-styles.deno.deno.net/styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart House Control</title>
   <style>
-    img {
-      display: inline-block;
-      vertical-align: middle;
-    }
+    body { font-family: system-ui, Arial, sans-serif; margin: 24px; line-height: 1.35; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; max-width: 880px; }
+    button { padding: 10px 14px; border-radius: 10px; border: 1px solid #bbb; background: #f7f7f7; cursor: pointer; }
+    button.primary { background: #1f6feb; border-color: #1f6feb; color: white; }
+    button.danger { background: #e5534b; border-color: #e5534b; color: white; }
+    input { padding: 10px; border-radius: 10px; border: 1px solid #bbb; min-width: 340px; }
+    code { background: #f3f3f3; padding: 2px 6px; border-radius: 6px; }
+    pre { background: #0b1020; color: #e6edf3; padding: 12px; border-radius: 10px; overflow: auto; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+    .ok { background: #2da44e; }
+    .bad { background: #e5534b; }
+    .muted { color: #666; }
   </style>
 </head>
-
 <body>
-    <main>
-      <section>
-        <a href="https://deno.com/deploy">
-        </a>
-      <h1>
-        <p>
-          Hello, Deno!
-        </p>
-      </h1>
-      <p>
-        This little example is being served by <a href="https://deno.com/">Deno</a>.
-        You can run it locally or in porduction on <a href="https://deno.com/deploy">Deno Deploy</a> or other hosting platforms.
-      </p>
-      <ul>
-        <li>Run it locally with<code>deno task dev</code></li>
-        <li>Deploy it to <a href="https://deno.com/deploy">Deno Deploy</a> via the CLI by running<code>deno deploy</code></li>
-        <li>Run it locally and share it publically by running <code>deno deploy --connected</code></li>
-      </ul>
-    </section>
-      <hr>
-    <section>
-      <h2>What's next?</h2>
-      <p>
-        You can clone this example and deploy it to Deno Deploy in just a few clicks
-        <a href="https://app.deno.com/new?clone=https://github.com/denoland/examples&path=hello-world"><img src="https://deno.com/button" alt="Deploy on Deno"/></a>
-      </p>
-      <ul>
-        <li>
-          <a href="https://docs.deno.com/examples">More examples in the Deno Docs</a>
-        </li>
-        <li>
-          <a href="https://deno.com/deploy">Deno Deploy Early Access</a>
-        </li>
-      </ul>
-    </section>
-    </main>
-    <hr>
-    <footer>
-      <section>
-      <ul class="flex-btwn">
-        <li>
-          <a href="https://deno.com">BlueSky</a>
-        </li>
-        <li>
-          <a href="https://deno.com">Twitter</a>
-        </li>
-        <li>
-          <a href="https://deno.com">YouTube</a>
-        </li>
-        <li>
-          <a href="https://deno.com">Newsletter</a>
-        </li>
-        <li>
-          <a href="https://deno.com">Deno</a>
-        </li>
-      </ul>
-      </section>
-    </footer>
+  <h1>Smart House Control (Test UI)</h1>
+
+  <div class="card">
+    <div class="row">
+      <label><strong>Deno API Base</strong></label>
+      <input id="apiBase" value="https://YOUR-DENO-DEPLOY-APP.deno.dev" />
+    </div>
+    <div class="row">
+      <label><strong>API Key</strong></label>
+      <input id="apiKey" value="CHANGE_ME_LONG_RANDOM_SECRET" />
+      <span class="muted">Sent as <code>x-api-key</code></span>
+    </div>
+    <div class="row">
+      <label><strong>Device ID</strong></label>
+      <input id="deviceId" value="house01" />
+    </div>
+
+    <div class="row">
+      <span id="connDot" class="status-dot bad"></span>
+      <strong id="connText">Not checked</strong>
+      <button id="btnCheck">Check Backend</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 16px;">
+    <h2>Door Control</h2>
+    <div class="row">
+      <button class="primary" id="btnOpen">Open Door</button>
+      <button class="danger" id="btnClose">Close Door</button>
+      <button id="btnReadTarget">Read doorTarget</button>
+    </div>
+    <div class="row">
+      <div><strong>doorTarget:</strong> <span id="doorTargetVal">—</span></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 16px;">
+    <h2>Live State (optional)</h2>
+    <div class="row">
+      <button id="btnReadState">Read /api/state</button>
+      <span class="muted">Requires you to implement <code>GET /api/state</code> in backend.</span>
+    </div>
+    <pre id="stateOut">{}</pre>
+  </div>
+
+  <div class="card" style="margin-top: 16px;">
+    <h2>Logs</h2>
+    <pre id="logOut"></pre>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function log(msg) {
+    const t = new Date().toISOString();
+    $("logOut").textContent = `[${t}] ${msg}\n` + $("logOut").textContent;
+  }
+
+  function cfg() {
+    return {
+      base: $("apiBase").value.replace(/\/+$/, ""),
+      key: $("apiKey").value,
+      deviceId: $("deviceId").value.trim() || "house01",
+    };
+  }
+
+  async function apiFetch(path, { method = "GET", body = null } = {}) {
+    const { base, key, deviceId } = cfg();
+    const url = `${base}${path}${path.includes("?") ? "&" : "?"}deviceId=${encodeURIComponent(deviceId)}`;
+
+    const headers = {
+      "x-api-key": key,
+    };
+    if (body !== null) headers["content-type"] = "application/json";
+
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: body === null ? null : JSON.stringify(body),
+    });
+
+    const text = await res.text();
+    return { ok: res.ok, status: res.status, text };
+  }
+
+  async function checkBackend() {
+    const { base } = cfg();
+    try {
+      const res = await fetch(base + "/");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      $("connDot").className = "status-dot ok";
+      $("connText").textContent = "Backend reachable";
+      log("Backend reachable");
+    } catch (e) {
+      $("connDot").className = "status-dot bad";
+      $("connText").textContent = "Backend unreachable";
+      log("Backend unreachable: " + e);
+    }
+  }
+
+  async function setDoorTarget(val) {
+    const res = await apiFetch("/api/commands/doorTarget", {
+      method: "POST",
+      body: { doorTarget: !!val },
+    });
+    if (!res.ok) {
+      log(`Set doorTarget failed: ${res.status} ${res.text}`);
+      alert("Failed: " + res.text);
+      return;
+    }
+    log(`Set doorTarget = ${val}`);
+    await readDoorTarget();
+  }
+
+  async function readDoorTarget() {
+    const res = await apiFetch("/api/commands/doorTarget", { method: "GET" });
+    if (!res.ok) {
+      log(`Read doorTarget failed: ${res.status} ${res.text}`);
+      $("doorTargetVal").textContent = "ERROR";
+      return;
+    }
+    const v = res.text.trim();
+    $("doorTargetVal").textContent = v;
+    log(`Read doorTarget = ${v}`);
+  }
+
+  async function readState() {
+    const res = await apiFetch("/api/state", { method: "GET" });
+    if (!res.ok) {
+      log(`Read state failed: ${res.status} ${res.text}`);
+      alert("Your backend does not have GET /api/state yet.\n\nResponse: " + res.text);
+      return;
+    }
+    try {
+      $("stateOut").textContent = JSON.stringify(JSON.parse(res.text), null, 2);
+    } catch {
+      $("stateOut").textContent = res.text;
+    }
+    log("Read state ok");
+  }
+
+  $("btnCheck").addEventListener("click", checkBackend);
+  $("btnOpen").addEventListener("click", () => setDoorTarget(true));
+  $("btnClose").addEventListener("click", () => setDoorTarget(false));
+  $("btnReadTarget").addEventListener("click", readDoorTarget);
+  $("btnReadState").addEventListener("click", readState);
+
+  // Auto-check on load
+  checkBackend();
+  readDoorTarget();
+</script>
 </body>
 </html>
