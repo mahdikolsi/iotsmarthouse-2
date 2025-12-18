@@ -1,31 +1,42 @@
-// main.ts - Deno Deploy backend for ESP32 Smart House (Option A)
-// - Validates x-api-key from ESP32/web
-// - Mints Google OAuth2 access_token from Service Account (JWT assertion)
-// - Uses Firebase Realtime Database REST API (GET/PATCH/PUT/POST)
+// main.ts - Deno Deploy backend (NO API KEY AUTH)
+// ESP32 Smart House (Option A)
 //
-// Expected env vars in Deno Deploy:
-//   API_KEY                         (shared secret; must match ESP32 API_KEY)
-//   FIREBASE_DATABASE_URL           (e.g. https://iotsmarthouse-85c1a-default-rtdb.europe-west1.firebasedatabase.app)
-//   FIREBASE_CLIENT_EMAIL           (service account client_email)
-//   FIREBASE_PRIVATE_KEY            (service account private_key; keep \n escaped or real newlines)
-//   DEFAULT_DEVICE_ID               (optional, default: house01)
-//   CORS_ORIGIN                     (optional, default: *)
+// Endpoints:
+//   GET  /api/commands/doorTarget?deviceId=house01   -> "true" / "false"
+//   POST /api/telemetry?deviceId=house01            -> writes telemetry/state/meta
+//   POST /api/state/door?deviceId=house01           -> ack door state + log
+//   POST /api/commands/doorTarget?deviceId=house01  -> set doorTarget (optional)
 //
+// Env vars required:
+//   FIREBASE_DATABASE_URL
+//   FIREBASE_CLIENT_EMAIL
+//   FIREBASE_PRIVATE_KEY
+// Optional:
+//   DEFAULT_DEVICE_ID
+//   CORS_ORIGIN
 
 type Json = Record<string, unknown>;
 
-const API_KEY = Deno.env.get("API_KEY") ?? "";
 const DB_URL = (Deno.env.get("FIREBASE_DATABASE_URL") ?? "").replace(/\/+$/, "");
 const CLIENT_EMAIL = Deno.env.get("FIREBASE_CLIENT_EMAIL") ?? "";
 const PRIVATE_KEY_RAW = Deno.env.get("FIREBASE_PRIVATE_KEY") ?? "";
 const DEFAULT_DEVICE_ID = Deno.env.get("DEFAULT_DEVICE_ID") ?? "house01";
 const CORS_ORIGIN = Deno.env.get("CORS_ORIGIN") ?? "*";
 
-if (!API_KEY || !DB_URL || !CLIENT_EMAIL || !PRIVATE_KEY_RAW) {
-  console.log("Missing env vars. Required: API_KEY, FIREBASE_DATABASE_URL, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY");
+if (!DB_URL || !CLIENT_EMAIL || !PRIVATE_KEY_RAW) {
+  console.log(
+    "Missing env vars. Required: FIREBASE_DATABASE_URL, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY",
+  );
 }
 
-// ---- Small helpers ----
+function corsHeaders(): HeadersInit {
+  return {
+    "access-control-allow-origin": CORS_ORIGIN,
+    "access-control-allow-headers": "content-type",
+    "access-control-allow-methods": "GET,POST,PUT,PATCH,OPTIONS",
+  };
+}
+
 function jsonResponse(body: unknown, status = 200, extraHeaders: HeadersInit = {}) {
   return new Response(JSON.stringify(body), {
     status,
@@ -48,18 +59,6 @@ function textResponse(body: string, status = 200, extraHeaders: HeadersInit = {}
   });
 }
 
-function corsHeaders(): HeadersInit {
-  return {
-    "access-control-allow-origin": CORS_ORIGIN,
-    "access-control-allow-headers": "content-type, x-api-key",
-    "access-control-allow-methods": "GET,POST,PUT,PATCH,OPTIONS",
-  };
-}
-
-function unauthorized() {
-  return textResponse("Unauthorized", 401);
-}
-
 function badRequest(msg: string) {
   return jsonResponse({ error: msg }, 400);
 }
@@ -73,7 +72,7 @@ function nowMs() {
   return Date.now();
 }
 
-// ---- Base64URL helpers for JWT ----
+// ---- Base64URL + JWT helpers ----
 function base64UrlEncode(bytes: Uint8Array): string {
   const b64 = btoa(String.fromCharCode(...bytes));
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
@@ -84,7 +83,6 @@ function utf8(s: string): Uint8Array {
 }
 
 function pemToPkcs8Der(pem: string): Uint8Array {
-  // Accept both real newlines and escaped \n from env var
   const normalized = pem.replace(/\\n/g, "\n").trim();
   const lines = normalized.split("\n").filter((l) => !l.includes("BEGIN") && !l.includes("END"));
   const b64 = lines.join("");
@@ -109,18 +107,18 @@ async function importPrivateKey(pem: string): Promise<CryptoKey> {
 let cachedToken: { accessToken: string; expMs: number } | null = null;
 
 async function getAccessToken(): Promise<string> {
-  // Refresh 5 minutes early
   if (cachedToken && nowMs() < cachedToken.expMs - 5 * 60 * 1000) {
     return cachedToken.accessToken;
   }
 
   const iat = Math.floor(Date.now() / 1000);
-  const exp = iat + 3600; // 1 hour
+  const exp = iat + 3600;
 
   const header = { alg: "RS256", typ: "JWT" };
   const payload = {
     iss: CLIENT_EMAIL,
-    scope: "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email",
+    scope:
+      "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email",
     aud: "https://oauth2.googleapis.com/token",
     iat,
     exp,
@@ -159,7 +157,6 @@ async function getAccessToken(): Promise<string> {
 }
 
 // ---- RTDB REST helpers ----
-// Uses: `${DB_URL}/${path}.json?access_token=...` :contentReference[oaicite:2]{index=2}
 async function rtdbFetch(path: string, init?: RequestInit): Promise<Response> {
   const token = await getAccessToken();
   const url = `${DB_URL}/${path.replace(/^\/+/, "")}.json?access_token=${encodeURIComponent(token)}`;
@@ -181,15 +178,6 @@ async function rtdbPatch(path: string, value: Json): Promise<void> {
   if (!resp.ok) throw new Error(`RTDB PATCH ${path} failed: ${resp.status} ${await resp.text()}`);
 }
 
-async function rtdbPut(path: string, value: unknown): Promise<void> {
-  const resp = await rtdbFetch(path, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(value),
-  });
-  if (!resp.ok) throw new Error(`RTDB PUT ${path} failed: ${resp.status} ${await resp.text()}`);
-}
-
 async function rtdbPost(path: string, value: unknown): Promise<{ name: string }> {
   const resp = await rtdbFetch(path, {
     method: "POST",
@@ -200,15 +188,8 @@ async function rtdbPost(path: string, value: unknown): Promise<{ name: string }>
   return await resp.json() as { name: string };
 }
 
-// ---- API key guard ----
-function checkApiKey(req: Request): boolean {
-  const k = req.headers.get("x-api-key") ?? "";
-  return k === API_KEY;
-}
-
 // ---- Router ----
 async function handle(req: Request): Promise<Response> {
-  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders() });
   }
@@ -216,34 +197,28 @@ async function handle(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const path = url.pathname;
 
-  // Public health
   if (req.method === "GET" && path === "/") {
     return textResponse("ok");
   }
-
-  // Everything else requires API key
-  if (!checkApiKey(req)) return unauthorized();
 
   const deviceId = getDeviceId(req);
   const base = `devices/${deviceId}`;
 
   try {
-    // ---- GET doorTarget for ESP polling ----
+    // GET: doorTarget
     if (req.method === "GET" && path === "/api/commands/doorTarget") {
       const v = await rtdbGet(`${base}/commands/doorTarget`);
-      const target = !!v;
-      // Return plain text "true"/"false" to keep ESP parsing simple
-      return textResponse(target ? "true" : "false");
+      return textResponse(!!v ? "true" : "false");
     }
 
-    // ---- POST telemetry from ESP ----
+    // POST: telemetry
     if (req.method === "POST" && path === "/api/telemetry") {
       const body = await req.json().catch(() => null) as (Json | null);
       if (!body) return badRequest("Invalid JSON");
 
-      // Expected ESP payload shape:
-      // { ms, wifiRssi, telemetry:{...}, state:{...} }
-      const telemetry = (body.telemetry && typeof body.telemetry === "object") ? body.telemetry as Json : {};
+      const telemetry = (body.telemetry && typeof body.telemetry === "object")
+        ? body.telemetry as Json
+        : {};
       const state = (body.state && typeof body.state === "object") ? body.state as Json : {};
       const deviceMs = typeof body.ms === "number" ? body.ms : null;
       const wifiRssi = typeof body.wifiRssi === "number" ? body.wifiRssi : null;
@@ -261,7 +236,7 @@ async function handle(req: Request): Promise<Response> {
       return jsonResponse({ ok: true });
     }
 
-    // ---- POST door state ACK (from ESP after RFID or remote command) ----
+    // POST: door ack + log
     if (req.method === "POST" && path === "/api/state/door") {
       const body = await req.json().catch(() => null) as (Json | null);
       if (!body) return badRequest("Invalid JSON");
@@ -277,7 +252,6 @@ async function handle(req: Request): Promise<Response> {
         lastDoorServerMs: nowMs(),
       });
 
-      // optional log entry
       await rtdbPost(`${base}/logs/door`, {
         doorOpen,
         source,
@@ -288,12 +262,10 @@ async function handle(req: Request): Promise<Response> {
       return jsonResponse({ ok: true });
     }
 
-    // ---- OPTIONAL: allow web app to set doorTarget ----
-    // Body: { doorTarget: true/false }
+    // OPTIONAL: set doorTarget (for web app)
     if (req.method === "POST" && path === "/api/commands/doorTarget") {
       const body = await req.json().catch(() => null) as (Json | null);
       if (!body) return badRequest("Invalid JSON");
-
       if (typeof body.doorTarget !== "boolean") return badRequest("doorTarget must be boolean");
 
       await rtdbPatch(`${base}/commands`, {
@@ -304,6 +276,12 @@ async function handle(req: Request): Promise<Response> {
       return jsonResponse({ ok: true });
     }
 
+    // OPTIONAL: read entire device tree (useful for debugging UI)
+    if (req.method === "GET" && path === "/api/state") {
+      const v = await rtdbGet(`${base}`);
+      return jsonResponse(v);
+    }
+
     return jsonResponse({ error: "Not found" }, 404);
   } catch (e) {
     console.log("Error:", e);
@@ -311,7 +289,4 @@ async function handle(req: Request): Promise<Response> {
   }
 }
 
-// Deno Deploy entrypoint (fetch handler) :contentReference[oaicite:3]{index=3}
-export default {
-  fetch: handle,
-};
+export default { fetch: handle };
